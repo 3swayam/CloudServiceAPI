@@ -1,11 +1,14 @@
 import webbrowser
-MAX_INPUT=2
-AZURE_URL="https://azure.microsoft.com/en-us/pricing/calculator/"
+
+EXTERNAL = "1"
+FIXED_COST = "1"
+FaaS = "1"
+AZURE_URL = "https://azure.microsoft.com/en-us/pricing/calculator/"
 SECTIONS_LIST = [
-    {"section": "Section A", "prices": ["Cost Of Ownership", "Application"]},
-    {"section": "Section B", "prices": ["Procurement", "Migration","Software Development"]},
-    {"section": "Section C", "prices": ["Internal", "usage","upgrade"]}, # internal
-    {"section": "Section D", "prices": ["CSP1","CSP2"]} # external
+    {"section": "A", "prices": ["Cost Of Ownership", "Application", "Development"]},  # internal
+    {"section": "B", "prices": ["Testing", "License", "Training"]},  # internal
+    {"section": "C", "prices": ["Hardware", "Data transfer"]},  # internal
+    {"section": "D", "prices": ["Data storage", "Container instances"]}  # external
 ]
 
 def get_input(prompt):
@@ -18,41 +21,91 @@ def get_input(prompt):
         except ValueError:
             print("Invalid input. Please enter a valid number.")
 
-def calculate_section_total(section_name, section_inputs):
-    print("calculate_section_total start hoga")
-    total = 0
-    print(f"\n{section_name}:")
-    for i in range(1, section_inputs + 1):
-        print(f"Now am running on counter {i} and total value ={total}")
-        value = get_input(f"Enter value {i}: ")
-        total += value
-    return total
 
-def calculate_external_section():
-    csp = input("Enter CSP value (leave blank or enter 0 for none): ").strip()
-    if not csp or csp == "0":
-        webbrowser.open_new(AZURE_URL)
-        csp = get_input("Enter CSP value after adding from the URL: ")
-    else:
-        csp = float(csp)
-    return csp
+def calculate_each_section(eachItem):
+    iteration_cost_per_section = 0
+    monthly_cost_per_section = 0
+    fixed_cost_per_section = 0
+    print("___________________________________________________________")
+    print("Let's enter price values for Section:", eachItem["section"])
+
+    for price in eachItem["prices"]:
+        print("**********************Let's get values for :", price)
+        # Get inputs for cost & service Type
+        cost_type = FIXED_COST
+        service_type = FaaS
+        if (price == "Development" or price == "Training"):
+            print("By default the cost is fixed cost.")
+        else:
+            cost_type = input(
+            "\nEnter type of (Fixed cost/monthly). Enter  " + FIXED_COST + " if Fixed, else monthly would be assumed: ").strip().lower()
+            service_type = input(
+            "\nEnter type of (FaaS/PaaS). Enter " + FaaS + "  if FaaS, else PaaS would be assumed: ").strip().lower()
+
+        isFixed = cost_type == FIXED_COST
+        isFaaS = service_type == FaaS
+
+        # Open URL for few sections price values
+        if (price == SECTIONS_LIST[3]['prices'][0] or price == SECTIONS_LIST[3]['prices'][1]):
+            webbrowser.open_new(AZURE_URL)
+
+        # Case1: Monthly FAAS - cost/iteration
+        if not isFixed and isFaaS:
+            cost_per_month = get_input(f"Please enter cost per month (in euro) : ")
+            no_of_iteration_monthly = get_input(f"Please enter no of iterations per month : ")
+
+            cost_per_iteration_for_price = (cost_per_month / no_of_iteration_monthly)
+            print("The cost for " + price + " in cost/iteration (in euro) is =",
+                  cost_per_iteration_for_price)
+
+            # Adding to section cost
+            iteration_cost_per_section = iteration_cost_per_section + cost_per_iteration_for_price
+
+        elif isFixed and isFaaS:
+            # Case2: Fixed FAAS   - cost/month and cost/iteration
+            if (price == "Development" or price == "Training"):
+                fixed_cost = get_input(f"Please enter (Fixed) cost of {price} (in euro): ")
+                fixed_cost_per_section = fixed_cost_per_section + fixed_cost
+            else:
+                fixed_cost = get_input(f"Please enter (Fixed) cost of {price} per month (in euro): ")
+                No_of_iterations = get_input(f"Please enter no of iterations per month {price}: ")
+                cost_per_iteration = fixed_cost / No_of_iterations
+                print("The cost for " + price + " in cost/month (in euro) is =",
+                   fixed_cost, "And cost per iteration (in euro) is =", cost_per_iteration)
+                # Yearly cost & yearly iteration no, to be divided by fixed cost per year
+                monthly_cost_per_section = monthly_cost_per_section + (fixed_cost)
+                iteration_cost_per_section = iteration_cost_per_section + cost_per_iteration
+        else:
+            # Case3 and Case4: Fixed PaaS  and Monthly PaaS  - cost/month
+            # value entered is monthly cost by default
+            cost_per_month = get_input(f"Please enter cost per month (in euro) : ")
+            print("The cost for " + price + " in cost/month (in euro) is =",
+                  cost_per_month)
+            # Adding to section cost
+            monthly_cost_per_section = monthly_cost_per_section + cost_per_month
+    return iteration_cost_per_section, monthly_cost_per_section, fixed_cost_per_section
 
 def main():
-    print("Main main me hu start")
-    total_a = calculate_section_total("Section A", 3)
-    total_b = calculate_section_total("Section B", MAX_INPUT)
-    
-    section_c_type = input("\nEnter type of Section C (internal/external): ").strip().lower()
-    if section_c_type == "external":
-        section_c_total = calculate_external_section()
-    elif section_c_type == "internal":
-        section_c_total = calculate_section_total("Section C", 2)
-    else:
-        print("Invalid section type. Please enter 'internal' or 'external'.")
-        return
-    
-    total = total_a + total_b + section_c_total
-    print("\nTotal spending on cloud service:", total)
+    total_Cost_per_iteration = 0
+    total_Cost_per_month = 0
+    total_Fixed_cost = 0
+    section_type = input(
+        "\nEnter type of (internal/external). Enter  " + EXTERNAL + "  if external, else internal would be assumed: ").strip().lower()
+
+    isExternal = section_type == "1"
+
+    # iterate through all sections and read values,
+    # 4th section would be added, only if it's of EXTERNAL Type
+    for eachItem in SECTIONS_LIST:
+        if isExternal or eachItem["section"] != SECTIONS_LIST[3]["section"]:
+            iteration_cost, monthly_cost, fixed_cost = calculate_each_section(eachItem)
+            total_Cost_per_iteration = total_Cost_per_iteration + iteration_cost
+            total_Cost_per_month = total_Cost_per_month + monthly_cost
+            total_Fixed_cost = total_Fixed_cost + fixed_cost
+    print("\nTotal spending on cloud service: Cost per iteration (in euro)", total_Cost_per_iteration)
+    print("\nTotal spending on cloud service: Cost per Month (in euro)", total_Cost_per_month)
+    print("\nTotal spending on cloud service: Fixed Cost (in euro)", total_Fixed_cost)
+
 
 if __name__ == "__main__":
     main()
